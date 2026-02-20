@@ -278,7 +278,8 @@ for year_subsel in ["JJA", "SON", "DJF", "MAM"]:
                     ny = len(y_dim)
                     
                     # define arrays to store aggregated data
-                    xmax[tagSS] = np.empty((nyear, ntimescale, nx, ny))
+                    # modif CC : nx and ny reversed
+                    xmax[tagSS] = np.empty((nyear, ntimescale, ny, nx))
 
                     # store coordinates
                     coords_x[tagSS] = x_dim
@@ -350,8 +351,9 @@ for year_subsel in ["JJA", "SON", "DJF", "MAM"]:
         print('Saving maxima for spatial scale '+tagSS)
 
         # create xarray dataset to save maxima
+        # modif CC : nx and ny reversed
         max_SS_dict = {
-            'maxpr': (('year','timescale','x', 'y'), xmax[tagSS]),
+            'maxpr': (('year','timescale','y', 'x'), xmax[tagSS]),
             'year': years,
             'x': coords_x[tagSS],
             'y': coords_y[tagSS],
@@ -386,7 +388,8 @@ for year_subsel in ["JJA", "SON", "DJF", "MAM"]:
         })
 
         # Save to NetCDF
-        ds.to_netcdf(path_out + file_out_fp + "_" + str(year_subsel) + "_" + 'max_scale_'+tagSS+'.nc')
+        # modif CC : years added in the file name
+        ds.to_netcdf(path_out + file_out_fp + str(year[0]) + "-" + str(year[-1]) + "_" + str(year_subsel) + "_" + 'max_scale_'+tagSS+'.nc')
 
 
     #_________________ 2. High percentiles ______________
