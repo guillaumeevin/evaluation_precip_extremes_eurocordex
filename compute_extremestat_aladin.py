@@ -162,7 +162,7 @@ with warnings.catch_warnings():
 da = xr.DataArray(time_axis, [("time", time_axis)])
 
 # temporal subselection for year ("yearly", "JJA", "SON", "DJF", "MAM")
-for year_subsel in ["JJA", "SON", "DJF", "MAM"]:
+for year_subsel in ["JJA"]: #, "SON", "DJF", "MAM"]:
     print("Start computation for season: " + year_subsel)
 
     # Compute total number of time steps
@@ -170,11 +170,11 @@ for year_subsel in ["JJA", "SON", "DJF", "MAM"]:
 
     # total number of time steps and number by time aggregation
     num_ts_tot = da_sel["time"].size
-    num_ts_tot_tagg = {}
-    for tagg in timescale_dim:
-        # index by tagg e.g. 24, 72
-        nagg = tagg / timescale_in
-        num_ts_tot_tagg[tagg] = int(num_ts_tot / nagg)
+    num_ts_tot_timescale = {}
+    for timescale in timescale_dim:
+        # index by timescale e.g. 24, 72
+        nagg = timescale / timescale_in
+        num_ts_tot_timescale[timescale] = int(num_ts_tot / nagg)
 
     t_beg_tot = time.time()
 
@@ -191,7 +191,7 @@ for year_subsel in ["JJA", "SON", "DJF", "MAM"]:
     num_keep = {}
     prec_keep = {}
     for timescale in timescale_dim:
-        num_keep[timescale] = (np.ceil(num_ts_tot[timescale] * (1.0 - qs.min() / 100.0)) + 1.0) \
+        num_keep[timescale] = (np.ceil(num_ts_tot_timescale[timescale] * (1.0 - qs.min() / 100.0)) + 1.0) \
             .astype(np.int32)
         prec_keep[timescale] = np.empty((len_y, len_x, num_keep[timescale]), dtype=np.float32)
         prec_keep[timescale].fill(-999.0)
@@ -303,7 +303,7 @@ for year_subsel in ["JJA", "SON", "DJF", "MAM"]:
         # initiliase prec_pred
         prec_per[timescale] = np.empty((len(qs), len_y, len_x), dtype=np.float32)
         prec_per[timescale].fill(np.nan)
-        x = np.linspace(0.0, 100.0, num_ts_tot[timescale], dtype=np.float32)
+        x = np.linspace(0.0, 100.0, num_ts_tot_timescale[timescale], dtype=np.float32)
         
         # num_keep and prec_keep for this time scale
         nk = num_keep[timescale]
@@ -370,7 +370,7 @@ for year_subsel in ["JJA", "SON", "DJF", "MAM"]:
 
         # Save to NetCDF
         # modif CC : years added in the file name
-        ds.to_netcdf(path_out + file_out_fp + str(year[0]) + "-" + str(year[-1]) + "_" + str(year_subsel) + "_" + 'max_scale_'+tagSS+'.nc')
+        ds.to_netcdf(path_out + file_out_fp + str(years[0]) + "-" + str(years[-1]) + "_" + str(year_subsel) + "_" + 'max_scale_'+tagSS+'.nc')
 
 
     #_________________ 2. High percentiles ______________
