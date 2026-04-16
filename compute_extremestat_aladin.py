@@ -57,16 +57,14 @@ if time_freq_in=="1hr":
 else:
     timescale_dim = [24,72]
 
+timescale_in = timescale_dim[0]
 ntimescale = len(timescale_dim)
 
-# define spatial scales: we aggregate several times 3x3 cells, e.g. 1x1, 3x3, 9x9
-# for 0.11deg resolution, 3x3 ~ 0.33deg, 9x9 ~ 1deg
+# define spatial scales: we aggregate several times 2x2 cells, e.g. 1x1, 2x2, 4x4
+# for 0.11deg resolution, 4x4 ~ 0.44deg
 # len_spatialscale defines how many spatial scales we consider
-# for EUROCORDEX at 0.11deg, we can consider up to 3 spatial scales: 1x1, 3x3, 9x9
-# CERRA: 3
-# ERA5-Land: 3
-# COMEPHORE: 5 
-nspatialscale = 3
+# for EUROCORDEX at 0.11deg, we can consider up to 5 spatial scales: 1x1, ... 16x16
+nspatialscale = 5
 
 # -----------------------------------------------------------------------------
 
@@ -108,9 +106,11 @@ interp_kind = "linear"
 # corresponding 'method' in np.percentile(). In Chinita et al. (2021), the
 # method 'higher' is applied (-> see supplementary material)
 
-# -----------------------------------------------------------------------------
+
+
+############################################################################
 # Preprocessing steps
-# -----------------------------------------------------------------------------
+############################################################################
 print(" Preprocessing steps " .center(79, "#"))
 
 # Check input settings
@@ -168,11 +168,13 @@ for year_subsel in ["JJA", "SON", "DJF", "MAM"]:
     # Compute total number of time steps
     da_sel = da.sel(time=da["time.season"] == year_subsel)
 
-    if time_freq_in=="1hr":
-        num_ts_tot_1hr = da_sel["time"].size
-        num_ts_tot_day = int(num_ts_tot_1hr/24)
-    else:
-        num_ts_tot_day = da_sel["time"].size
+    # total number of time steps and number by time aggregation
+    num_ts_tot = da_sel["time"].size
+    num_ts_tot_tagg = {}
+    for tagg in timescale_dim:
+        # index by tagg e.g. 24, 72
+        nagg = tagg / timescale_in
+        num_ts_tot_tagg[tagg] = int(num_ts_tot / nagg)
 
     t_beg_tot = time.time()
 
@@ -186,20 +188,18 @@ for year_subsel in ["JJA", "SON", "DJF", "MAM"]:
     coords_lon = {}
 
     # Allocate arrays for percentile
-    num_keep_day = (np.ceil(num_ts_tot_day * (1.0 - qs.min() / 100.0)) + 1.0) \
+    num_keep = {}
+    prec_keep = {}
+    for timescale in timescale_dim:
+        num_keep[timescale] = (np.ceil(num_ts_tot[timescale] * (1.0 - qs.min() / 100.0)) + 1.0) \
             .astype(np.int32)
-    prec_keep_day = np.empty((len_y, len_x, num_keep_day), dtype=np.float32)
-    prec_keep_day.fill(-999.0)
-    
-    if time_freq_in=="1hr":
-        num_keep_1hr = (np.ceil(num_ts_tot_1hr * (1.0 - qs.min() / 100.0)) + 1.0) \
-            .astype(np.int32)
-        prec_keep_1hr = np.empty((len_y, len_x, num_keep_1hr), dtype=np.float32)
-        prec_keep_1hr.fill(-999.0)
+        prec_keep[timescale] = np.empty((len_y, len_x, num_keep[timescale]), dtype=np.float32)
+        prec_keep[timescale].fill(-999.0)
     
     # Loop through years
     out_unit = {"1hr": "mm h-1", "day": "mm day-1"}  # output units
     for ind, year in enumerate(years):
+        prec_year = {}
 
         print((" Process year " + str(year) + " ").center(79, "-"))
 
@@ -217,7 +217,7 @@ for year_subsel in ["JJA", "SON", "DJF", "MAM"]:
         ds = ds.sel(time=ds["time.season"] == year_subsel)
         len_t = ds.coords["time"].size
         ds_prec = ds[namevar]*unit_con_fac  # conversion to [mm h-1] or [mm day-1]
-        prec = ds_prec.values
+        prec_year[timescale_in] = ds_prec.values
         ds.close()
         
         print("Data loaded (" + "%.1f" % (time.time() - t_beg) + " s)")
@@ -251,9 +251,9 @@ for year_subsel in ["JJA", "SON", "DJF", "MAM"]:
                     # when i=1, S1 is the finer scale 1x1, we want to aggregate to 3x3, when i=2, S2 is 3x3, we want to aggregate to 9x9, etc. 
                     fine_spatialscale = 'S'+str(i_spatialscale)
                     if(out_dim == ("y", "x")):
-                        Xagg[tagTS][tagSS] = Xagg['T1'][fine_spatialscale].coarsen(x=3, y=3, boundary='pad').mean()
+                        Xagg[tagTS][tagSS] = Xagg['T1'][fine_spatialscale].coarsen(x=2, y=2, boundary='pad').mean()
                     else:
-                        Xagg[tagTS][tagSS] = Xagg['T1'][fine_spatialscale].coarsen(rlon=3, rlat=3, boundary='pad').mean()
+                        Xagg[tagTS][tagSS] = Xagg['T1'][fine_spatialscale].coarsen(rlon=2, rlat=2, boundary='pad').mean()
                 # for larger time scales, we aggregate temporally from the finer time scale
                 else:
                     # temporal aggregation: get sum in mm
@@ -262,8 +262,8 @@ for year_subsel in ["JJA", "SON", "DJF", "MAM"]:
                     Xagg[tagTS][tagSS] = dsagg
 
                     # keep daily prec if not already in prec
-                    if(i_spatialscale==0 and timescale==24):
-                        precday = dsagg.values
+                    if(i_spatialscale==0):
+                        prec_year[timescale] = dsagg.values
 
                 if(i_timescale==0 and ind==0):
                     # get dimensions to save in a xarray Dataset later
@@ -292,51 +292,32 @@ for year_subsel in ["JJA", "SON", "DJF", "MAM"]:
                 xmax[tagSS][ind, i_timescale, :, :] = Xagg[tagTS][tagSS].max(dim='time')
 
         # Update maximal values for percentile computation
-        if time_freq_in=="1hr":
-            update_max_values_all_day(prec_keep_1hr, prec, len_y, len_x, num_keep_1hr)
-            update_max_values_all_day(prec_keep_day, precday, len_y, len_x, num_keep_day)
-        else:                
-            update_max_values_all_day(prec_keep_day, prec, len_y, len_x, num_keep_day)
+        for timescale in timescale_dim:
+            update_max_values_all_day(prec_keep[timescale], prec_year[timescale], len_y, len_x, num_keep[timescale])
 
     # Compute percentiles for entire period
     t_beg = time.time()
-    if time_freq_in=="1hr":
-        prec_per_1hr = np.empty((len(qs), len_y, len_x), dtype=np.float32)
-        prec_per_1hr.fill(np.nan)
-        x = np.linspace(0.0, 100.0, num_ts_tot_1hr, dtype=np.float32)
-        if qs.min() < x[-num_keep_1hr]:
-            raise ValueError("x-position for interpolation is out of range")
-        for i in range(len_y):
-            for j in range(len_x):
-                f_ip = interpolate.interp1d(x[-num_keep_1hr:], prec_keep_1hr[i, j, :],
-                                            bounds_error=True, kind=interp_kind,
-                                            assume_sorted=True)
-                prec_per_1hr[:, i, j] = f_ip(qs)
+
+    prec_per = {}
+    for timescale in timescale_dim:
+        # initiliase prec_pred
+        prec_per[timescale] = np.empty((len(qs), len_y, len_x), dtype=np.float32)
+        prec_per[timescale].fill(np.nan)
+        x = np.linspace(0.0, 100.0, num_ts_tot[timescale], dtype=np.float32)
         
-        prec_per_day = np.empty((len(qs), len_y, len_x), dtype=np.float32)
-        prec_per_day.fill(np.nan)
-        x = np.linspace(0.0, 100.0, num_ts_tot_day, dtype=np.float32)
-        if qs.min() < x[-num_keep_day]:
+        # num_keep and prec_keep for this time scale
+        nk = num_keep[timescale]
+        pk = prec_keep[timescale]
+
+        # find percentiles
+        if qs.min() < x[-nk]:
             raise ValueError("x-position for interpolation is out of range")
         for i in range(len_y):
             for j in range(len_x):
-                f_ip = interpolate.interp1d(x[-num_keep_day:], prec_keep_day[i, j, :],
-                                            bounds_error=True, kind=interp_kind,
-                                            assume_sorted=True)
-                prec_per_day[:, i, j] = f_ip(qs)
-    else:
-        prec_per_day = np.empty((len(qs), len_y, len_x), dtype=np.float32)
-        prec_per_day.fill(np.nan)
-        print("Compute all day precipitation percentiles")
-        x = np.linspace(0.0, 100.0, num_ts_tot_day, dtype=np.float32)
-        if qs.min() < x[-num_keep_day]:
-            raise ValueError("x-position for interpolation is out of range")
-        for i in range(len_y):
-            for j in range(len_x):
-                f_ip = interpolate.interp1d(x[-num_keep_day:], prec_keep_day[i, j, :],
-                                            bounds_error=True, kind=interp_kind,
-                                            assume_sorted=True)
-                prec_per_day[:, i, j] = f_ip(qs)
+                f_ip = interpolate.interp1d(x[-nk:], pk[i, j, :], bounds_error=True, 
+                                            kind=interp_kind, assume_sorted=True)
+                prec_per[timescale][:, i, j] = f_ip(qs)
+
     print("Compute percentiles (" + "%.1f" % (time.time() - t_beg) + " s)")
 
 
@@ -409,29 +390,18 @@ for year_subsel in ["JJA", "SON", "DJF", "MAM"]:
     encoding_nan = {i: {"_FillValue": nan_val} for i in ["perc_%.2f" % i for i in qs]}
     encoding_no_nan = {i: {"_FillValue": None} for i in list({"rlon", "rlat", "x", "y", "lon", "lat"}
                             .intersection(set(ds.variables)))}
-
-    if time_freq_in=="1hr":
-        # 1hr
+    
+    # write one netcdf per time scale
+    for timescale in timescale_dim:
         for ind, q in enumerate(qs):
             name = "perc_%.2f" % q
-            ds[name] = (out_dim, np.nan_to_num(prec_per_1hr[ind, :, :], nan=nan_val))
-            ds[name].attrs["units"] = 'mm h-1'
-        
+            ds[name] = (out_dim, np.nan_to_num(prec_per[timescale][ind, :, :], nan=nan_val))
+            ds[name].attrs["units"] = 'mm day-1'
+
         fn_add = str(years[0]) + "-" + str(years[-1]) + "_" + str(year_subsel) \
-        + "_" + percentile_method + "_1hr_perc"
+        + "_" + percentile_method + "_" + str(timescale) + "h_perc"
         ds.to_netcdf(path_out + file_out_fp + fn_add + ".nc",
                     encoding={**encoding_nan, **encoding_no_nan})
-
-    # in all cases, daily scale
-    for ind, q in enumerate(qs):
-        name = "perc_%.2f" % q
-        ds[name] = (out_dim, np.nan_to_num(prec_per_day[ind, :, :], nan=nan_val))
-        ds[name].attrs["units"] = 'mm day-1'
-
-    fn_add = str(years[0]) + "-" + str(years[-1]) + "_" + str(year_subsel) \
-    + "_" + percentile_method + "_day_perc"
-    ds.to_netcdf(path_out + file_out_fp + fn_add + ".nc",
-                encoding={**encoding_nan, **encoding_no_nan})
 
 
     print("Total elapsed time: %.1f" % (time.time() - t_beg_tot) + " s")
