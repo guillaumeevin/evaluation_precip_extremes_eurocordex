@@ -85,7 +85,7 @@ def getScalingParameter(maxSeas):
             x = vec_order
             y = kq
             reg_linear = sm.OLS(y, x).fit()
-            scalingPar[iLon,iLat] = -reg_linear.params
+            scalingPar[iLon,iLat] = -reg_linear.params[0]
 
     return scalingPar
 
@@ -93,14 +93,17 @@ def getScalingParameter(maxSeas):
 # estimate scaling parameters from observations
 #______________________________________________________________________________________________________________
 folder_obs = 'D:/EUROCORDEX_extremes/DATA/OBS/'
-name_obs = ['OBS_COMEPHORE_011EUi_1997-2022','OBS_RADKLIM_011EUi_2001-2022', 'OBS_GRIPHO_011EUi_2001-2016']
+name_obs = ['OBS_KNMI_011EUi_1998-2022','OBS_CPC_011EUi_2005-2022',
+             'OBS_CEH-GEAR_011EUi_1990-2016', 'OBS_KLIMGRID_011EUi_2011-2019' ]
+#             'OBS_COMEPHORE_011EUi_1997-2022','OBS_RADKLIM_011EUi_2001-2022', 
+#             'OBS_GRIPHO_011EUi_2001-2016']
 
-if(False):
+if(True):
     for season in ["JJA","SON","DJF","MAM"]:
         for obs in name_obs:
         
             fObs = f'{obs}_{season}_max_scale_S1.nc'
-            dsObs = xr.load_dataset(folder_obs+fObs, engine="netcdf4")
+            dsObs = xr.load_dataset(folder_obs+fObs, engine="netcdf4",decode_timedelta=True)
 
             scalingPar = getScalingParameter(dsObs.maxpr.values)
             dsObs = dsObs.cf.add_bounds(["lon","lat"])
@@ -128,24 +131,25 @@ name_models = ['ERA5_ALARO1-SFX','ERA5_CCLM6-0-1','ERA5_CNRM-ALADIN64E1',
               'ERA5_HCLIM43-ALADIN','ERA5_ICON-CLM-202407-1-1','ERA5_RACMO23E',
               'ERA5_RegCM5-0','ERA5_REMO2020-2-2','ERA5_WRF451Q']
 
-for season in ["JJA","SON","DJF","MAM"]:
-  
-  # loop over model
-  for model in name_models:
-    print("process data for model " + model + " and season " + season)
-  
-    fMod = f'{model}1980-2020_{season}_max_scale_S1.nc'
-    dsMod = xr.load_dataset(folder_model+fMod, engine="netcdf4")
+if(False):
+    for season in ["JJA","SON","DJF","MAM"]:
+    
+        # loop over model
+        for model in name_models:
+            print("process data for model " + model + " and season " + season)
+        
+            fMod = f'{model}1980-2020_{season}_max_scale_S1.nc'
+            dsMod = xr.load_dataset(folder_model+fMod, engine="netcdf4",decode_timedelta=True)
 
-    if model == 'ERA5_RegCM5-0':
-        dsMod = dsMod.assign_coords(rlat=rlat_424_412, rlon=rlon_424_412)
+            if model == 'ERA5_RegCM5-0':
+                dsMod = dsMod.assign_coords(rlat=rlat_424_412, rlon=rlon_424_412)
 
-    scalingPar = getScalingParameter(dsMod.maxpr.values)
+            scalingPar = getScalingParameter(dsMod.maxpr.values)
 
-    dsMod = dsMod.cf.add_bounds(["lon","lat"])
+            dsMod = dsMod.cf.add_bounds(["lon","lat"])
 
-    dsMod_cor = dsMod.drop_vars("maxpr")
+            dsMod_cor = dsMod.drop_vars("maxpr")
 
-    dsMod_cor["scalingPar"] = (("y", "x"), scalingPar)
+            dsMod_cor["scalingPar"] = (("y", "x"), scalingPar)
 
-    dsMod_cor.to_netcdf(f'D:/EUROCORDEX_extremes/DATA/SIMPLESCALING/simplescaling_{model}_{season}.nc')
+            dsMod_cor.to_netcdf(f'D:/EUROCORDEX_extremes/DATA/SIMPLESCALING/simplescaling_{model}_{season}.nc')

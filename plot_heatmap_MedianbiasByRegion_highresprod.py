@@ -73,7 +73,6 @@ name_models = ['ERA5_ALARO1-SFX','ERA5_CCLM6-0-1','ERA5_CNRM-ALADIN64E1',
 label_models = ['ALARO1-SFX','CCLM6-0-1','ALADIN64E1',
             'HCLIM43','ICON-CLM','RACMO23E',
             'RegCM5-0','REMO2020','WRF451Q']
-name_obs = 'OBS_CERRALAND_011EUi_1986-2020'
 
 
 # regions prudence
@@ -104,12 +103,12 @@ def quatromatrix(left, bottom, right, top, ax=None, triplotkw={},tripcolorkw={})
     return tripcolor
 
 # only three regions have high-resolution data so far
-vecregion = ["France","Mid-Europe","Mediterranean"]
+vecregion = ["France","Mid-Europe","Mediterranean","British Isles"]
 
 # at an hourly scale
 agg = '1'
 
-for quantile in ['perc_99.00']: #['perc_99.00', 'perc_99.90']:
+for quantile in ['perc_99.00', 'perc_99.90']:
 
     #======================================================================
     # STEP 1: create and save a data.frame with all the data for the boxplot
@@ -136,6 +135,8 @@ for quantile in ['perc_99.00']: #['perc_99.00', 'perc_99.90']:
                     name_obs = "OBS_RADKLIM_011EUi_2001-2022"
                 elif region == "Mediterranean":
                     name_obs = "OBS_GRIPHO_011EUi_2001-2016"
+                elif region == "British Isles":
+                    name_obs = "OBS_CEH-GEAR_011EUi_1990-2016"
 
                 gdfregion = gdf.loc[gdf['names'] == region]
                 minx, miny, maxx, maxy = gdfregion.geometry.total_bounds
@@ -244,5 +245,5 @@ for quantile in ['perc_99.00']: #['perc_99.00', 'perc_99.90']:
     ax2.axis('off')
 
     # save the figure
-    plt.savefig(f'D:/EUROCORDEX_extremes/PAPER/heatmap_1h_reldiff_{quantile}_discretecolors.png', 
+    plt.savefig(f'D:/EUROCORDEX_extremes/PAPER/heatmap_{agg}h_reldiff_{quantile}_discretecolors.png', 
                 dpi=300, bbox_inches='tight')

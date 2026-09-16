@@ -32,7 +32,7 @@ import cartopy
 # 983–1003, https://doi.org/10.5194/essd-13-983-2021, 2021
 
 # main folder
-folder = "D:/EUROCORDEX_extremes/10yrRL_BenPosch/"
+folder = "D:/EUROCORDEX_extremes/DATA/10yrRL_BenPosch/"
 
 # Compute lon/lat from rotated coordinates for the reference dataset
 def unrot_lon(rlat, rlon, pole_lat, pole_lon):
@@ -131,8 +131,12 @@ projplot_name       = "LambertConformal"
 projplot_dict  = dict(central_longitude=10.5, central_latitude=49.5, standard_parallels=(33,45))
 projplot       = ccrs.__dict__[projplot_name].__call__(**projplot_dict)
 
+hersh_correction = [1,1.1,1.1,1.11,1.14]
+
+vec_time_scale = ['1','3','6','12','24']
+
 for diff in ['rel','abs']:
-    for time_scale in ['1','3','6','12','24']:
+    for time_scale in vec_time_scale:
         # Initialiser la figure et les axes
         fig, axes = plt.subplots(nrows=3, ncols=3, subplot_kw={'projection': projplot},figsize=(8,9))
 
@@ -186,7 +190,7 @@ for diff in ['rel','abs']:
             X = dsObs_clean.lon
             Y = dsObs_clean.lat
             ZOBS = dsObs_clean.RL
-            ZMOD = dsMod_regrid.RL
+            ZMOD = dsMod_regrid.RL*hersh_correction[vec_time_scale.index(time_scale)]
             
             if(diff=="rel"):
                 Z = (ZMOD / ZOBS - 1) * 100 # Calculate percentage difference
