@@ -129,20 +129,15 @@ label_models = ['ALADIN64E1','ALARO1-SFX','CCLM6-0-1',
             'HCLIM43','ICON-CLM','RACMO23E',
             'RegCM5-0','REMO2020','WRF451Q']
 
-# vector of countries
-vec_region_country = ["France","Italy","Germany"]
-
 # vector of regions PRUDENCE
-vec_region_PRUDENCE = ["France","Mediterranean","Mid-Europe"]
+vec_region_PRUDENCE = ["British Isles", "France","Mediterranean","Mid-Europe"]
 
 # vector of national products
-vec_prod = ["OBS_COMEPHORE_011EUi_1997-2022","OBS_GRIPHO_011EUi_2001-2016",
-                         "OBS_RADKLIM_011EUi_2001-2022"]
-vec_prod_lab = ["COMEPHORE","GRIPHO","RADKLIM"]
+vec_prod = ["OBS_CEH-GEAR_011EUi_1990-2016","OBS_COMEPHORE_011EUi_1997-2022","OBS_GRIPHO_011EUi_2001-2016",
+            "OBS_RADKLIM_011EUi_2001-2022"]
+vec_prod_lab = ["CEH-GEAR","COMEPHORE","GRIPHO","RADKLIM"]
 
 for iregion, region_prudence in enumerate(vec_region_PRUDENCE):
-    # countries
-    country = vec_region_country[iregion]
 
     # products
     prod = vec_prod[iregion]
@@ -229,7 +224,9 @@ for iregion, region_prudence in enumerate(vec_region_PRUDENCE):
     # add colorbar
     cbar = fig.colorbar(p, ax=axes, aspect=20, orientation="vertical", shrink=0.8, 
                         anchor=(0.0, 0.0), extend='both', extendfrac=0.1)
-    cbar.set_label('Median difference (%)', fontsize=12)
+    cbar.set_label('Median difference (%)', fontsize=10)
+    cbar.ax.tick_params(labelsize=10)
+
 
     # Coordinates [left, bottom, width, height] as fractions of the figure (0 to 1)
     ax2 = fig.add_axes([0.78, 0.75, 0.1, 0.1])
@@ -254,4 +251,5 @@ for iregion, region_prudence in enumerate(vec_region_PRUDENCE):
     ax2.axis('off')
 
     # save the figure
-    plt.savefig(f'D:/EUROCORDEX_extremes/PAPER/20yrRL_multiscale_{prod_lab}_{region_prudence}.png', dpi=300)
+    plt.savefig(f'D:/EUROCORDEX_extremes/PAPER/20yrRL_multiscale_{prod_lab}_{region_prudence}.png', 
+                dpi=300, bbox_inches='tight', pad_inches=0)
