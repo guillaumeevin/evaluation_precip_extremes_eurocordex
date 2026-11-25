@@ -7,7 +7,7 @@ import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
 import cartopy.feature as cfeature
 import os
-os.environ['ESMFMKFILE'] = 'C:/Users/eving/AppData/Local/miniconda3/envs/evalprecextremes/Library/lib/esmf.mk'
+os.environ['ESMFMKFILE'] = '/exec/gevin/.conda/envs/myxscen/lib/esmf.mk'
 import xesmf as xe
 import numpy as np
 np.float_ = np.float64
@@ -24,58 +24,40 @@ from scipy import stats
 import statsmodels.api as sm
 import cartopy
 import matplotlib.colors as colors
+from utils import quatromatrix
 
 ##############################################################################
-# STEP 2: function for plotting heatmap with quadrants
-##############################################################################
-def quatromatrix(left, bottom, right, top, ax=None, triplotkw={},tripcolorkw={}):
-    if not ax: ax=plt.gca()
-    n = left.shape[0]; m=left.shape[1]
-
-    a = np.array([[0,0],[0,1],[.5,.5],[1,0],[1,1]])
-    tr = np.array([[0,1,2], [0,2,3],[2,3,4],[1,2,4]])
-
-    A = np.zeros((n*m*5,2))
-    Tr = np.zeros((n*m*4,3))
-
-    for i in range(n):
-        for j in range(m):
-            k = i*m+j
-            A[k*5:(k+1)*5,:] = np.c_[a[:,0]+j, a[:,1]+i]
-            Tr[k*4:(k+1)*4,:] = tr + k*5
-
-    C = np.c_[ left.flatten(), bottom.flatten(), 
-              right.flatten(), top.flatten()   ].flatten()
-
-    triplot = ax.triplot(A[:,0], A[:,1], Tr, **triplotkw)
-    tripcolor = ax.tripcolor(A[:,0], A[:,1], Tr, facecolors=C, **tripcolorkw)
-    return tripcolor
-
-##############################################################################
-# STEP 3: Regrid output of the models to match the output from the obs on the
+# STEP 2: Regrid output of the models to match the output from the obs on the
 #  regular lat/lon grid
 ##############################################################################
 
 # folder_obs and folder_sim contain the maxima aggregated at different spatial scales
 # folder_RL20 contains the 20-year return level estimates (obs and sim)
-folder_obs = 'D:/EUROCORDEX_extremes/DATA/OBS/'
-folder_sim = 'D:/EUROCORDEX_extremes/DATA/SIM/'
-folder_RL20 = "D:/EUROCORDEX_extremes/20yrRL/"
+folder_obs = "/jarre/gevin/EUROCORDEX/DATA/OBS/"
+folder_sim = "/jarre/gevin/EUROCORDEX/DATA/SIM/"
+folder_RL20 = "/jarre/gevin/EUROCORDEX/RL/20YR/"
 
-# list models and obs
-name_models = ['ERA5_CNRM-ALADIN64E1','ERA5_ALARO1-SFX','ERA5_CCLM6-0-1',
-            'ERA5_HCLIM43-ALADIN','ERA5_ICON-CLM-202407-1-1','ERA5_RACMO23E',
-            'ERA5_RegCM5-0','ERA5_REMO2020-2-2','ERA5_WRF451Q']
+# list models and labels
+vec_model = ["ERA5_ALARO1-SFX","ERA5_CNRM-ALADIN64E1","ERA5_HCLIM43-ALADIN","ERA5_CCLM6-0-1",
+             "ERA5_GCOAST-AHOIB1-1", "ERA5_ICON-CLM-202407-1-1",
+             "ERA5_RACMO23E","ERA5_RegCM5-0","ERA5_REMO2020-2-2",
+             "ERA5_ROAM-NBS","ERA5_TSMP1-140-E","ERA5_WRF451Q-r1"]
+vec_label = ["ALARO1-SFX","ALADIN64E1","HCLIM43","CCLM6-0-1",
+             "GC-AHOIB1", "ICON-CLM", "RACMO23E","RegCM5-0","REMO2020-2-2",
+             "ROAM-NBS","TSMP1-140-E","WRF451Q-r1"]
 
-if(False):
+# regions PRUDENCE
+gdf = gpd.read_file("regions.geojson")
+
+if(True):
     # load one obs dataset on the regular 11deg grid
     for spatial_scale in ['S1','S2','S3','S4']:
         # dsObs is used to regrid the models' outputs
-        file_obs = f"OBS_ERA5_011EUi_1980-2022_JJA_max_scale_{spatial_scale}.nc"
+        file_obs = f"OBS_ERA5_011EUi_1980-2020_JJA_max_scale_{spatial_scale}.nc"
         dsObs = xr.load_dataset(folder_obs+file_obs, engine="netcdf4", decode_timedelta=False)
         dsObs = dsObs.cf.add_bounds(["lon","lat"])
 
-        for model in name_models:
+        for model in vec_model:
             for season in ["JJA","SON","DJF","MAM"]:
                 for time_scale in ["1hr","3hr","6hr","12hr","24hr","72hr"]:
 
@@ -111,44 +93,35 @@ if(False):
                     np.savetxt(fname=folder_RL20+file_RL20,X=x, fmt="%.2f", delimiter=',')
 
 ##############################################################################
-# STEP 4: Compute differences with national products for different regions
+# STEP 3: Compute differences with national products for different regions
 ##############################################################################
 
-# regions PRUDENCE
-gdf = gpd.read_file("regions.geojson")
-
-# folder containing the 20-year return level estimates
-folder_RL20 = "D:/EUROCORDEX_extremes/20yrRL/"
-
-# list models and obs
-name_models = ['ERA5_CNRM-ALADIN64E1','ERA5_ALARO1-SFX','ERA5_CCLM6-0-1',
-            'ERA5_HCLIM43-ALADIN','ERA5_ICON-CLM-202407-1-1','ERA5_RACMO23E',
-            'ERA5_RegCM5-0','ERA5_REMO2020-2-2','ERA5_WRF451Q']
-
-label_models = ['ALADIN64E1','ALARO1-SFX','CCLM6-0-1',
-            'HCLIM43','ICON-CLM','RACMO23E',
-            'RegCM5-0','REMO2020','WRF451Q']
-
 # vector of regions PRUDENCE
-vec_region_PRUDENCE = ["British Isles", "France","Mediterranean","Mid-Europe"]
+vec_region_PRUDENCE = ["France","Mid-Europe","Mediterranean","British Isles"]
+vec_region_tag = ["France","Germany","Italy","Great Britain"]
 
 # vector of national products
-vec_prod = ["OBS_CEH-GEAR_011EUi_1990-2016","OBS_COMEPHORE_011EUi_1997-2022","OBS_GRIPHO_011EUi_2001-2016",
-            "OBS_RADKLIM_011EUi_2001-2022"]
-vec_prod_lab = ["CEH-GEAR","COMEPHORE","GRIPHO","RADKLIM"]
+vec_prod = ["OBS_COMEPHORE_011EUi_1997-2025","OBS_RADKLIM_011EUi_2001-2025",
+            "OBS_GRIPHO_011EUi_2001-2016","OBS_CEH-GEAR_011EUi_1990-2016"]
+
+label_region = {"France":"France / COMEPHORE",
+                "Mid-Europe": "Germany / RADKLIM",
+                "Mediterranean": "Italy / GRIPHO",
+                "British Isles": "Great Britain / CEH-GEAR"}
 
 for iregion, region_prudence in enumerate(vec_region_PRUDENCE):
 
     # products
     prod = vec_prod[iregion]
-    prod_lab = vec_prod_lab[iregion]
+    prod_lab = label_region[region_prudence]
 
     # select one region
     region_gdf = gdf.loc[gdf['names'] == region_prudence]
+    tag_region = vec_region_tag[iregion]
 
-    fig, axes = plt.subplots(nrows=3,ncols=3)
+    fig, axes = plt.subplots(nrows=3,ncols=4,figsize=(6.5, 3.5), constrained_layout=True)
 
-    for ax, model, label in zip(axes.flat, name_models, label_models):
+    for ax, model, label in zip(axes.flat, vec_model, vec_label):
 
         # initialise list
         dict_median = {}
@@ -174,7 +147,6 @@ for iregion, region_prudence in enumerate(vec_region_PRUDENCE):
                     RL20_sim[RL20_sim<0] = np.nan
 
                     # get lon/lat reg
-                    folder_obs = 'D:/EUROCORDEX_extremes/DATA/OBS/'
                     file_obs = f"{prod}_JJA_max_scale_{spatial_scale}.nc"
                     dsObs = xr.load_dataset(folder_obs+file_obs, engine="netcdf4", decode_timedelta=False)
                     lat = dsObs.lat
@@ -217,7 +189,7 @@ for iregion, region_prudence in enumerate(vec_region_PRUDENCE):
         ax.set_yticks(np.arange(len(vec_spatial_scale))+0.5)
         ax.set_yticklabels(vec_spatial_scale, rotation=90, fontsize=7)
         ax.set_xticks(np.arange(len(vec_temporal_scale))+0.5)
-        ax.set_xticklabels(['1h','3h','6h','12h','24h','72h'], fontsize=7)
+        ax.set_xticklabels(['T1','T2','T3','T4','T5','T6'], fontsize=7)
         ax.tick_params(axis='x', pad=2)
         ax.tick_params(axis='y', pad=2)
 
@@ -229,7 +201,7 @@ for iregion, region_prudence in enumerate(vec_region_PRUDENCE):
 
 
     # Coordinates [left, bottom, width, height] as fractions of the figure (0 to 1)
-    ax2 = fig.add_axes([0.78, 0.75, 0.1, 0.1])
+    ax2 = fig.add_axes([0.87, 0.8, 0.1, 0.1])
 
     # 2. Cross the square with diagonal lines to form 4 triangles
     ax2.plot([0, 1], [0, 1], color='black', lw=1.5) # Diagonal from bottom-left to top-right
@@ -251,5 +223,5 @@ for iregion, region_prudence in enumerate(vec_region_PRUDENCE):
     ax2.axis('off')
 
     # save the figure
-    plt.savefig(f'D:/EUROCORDEX_extremes/PAPER/20yrRL_multiscale_{prod_lab}_{region_prudence}.png', 
+    plt.savefig(f'/exec/gevin/evaluation_precip_extremes_eurocordex/PAPER/20yrRL_multiscale_{tag_region}.png', 
                 dpi=300, bbox_inches='tight', pad_inches=0)
